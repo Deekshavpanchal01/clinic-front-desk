@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinic Front Desk System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --accent: #e74c3c;
+            --light: #ecf0f1;
+            --dark: #34495e;
+            --success: #2ecc71;
+            --warning: #f39c12;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            border-left: 4px solid var(--success);
+            padding: 15px 20px;
+            border-radius: 5px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+            max-width: 350px;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.error {
+            border-left-color: var(--accent);
+        }
+        
+        .notification.error .notification-icon {
+            color: var(--accent);
+        }
+        
+        .notification-icon {
+            color: var(--success);
+            font-size: 1.5rem;
+        }
+        
+        .notification-close {
+            margin-left: 15px;
+            cursor: pointer;
+            color: #aaa;
+        }
+        
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .status-waiting {
+            background: rgba(243, 156, 18, 0.1);
+            color: var(--warning);
+        }
+        
+        .status-with-doctor {
+            background: rgba(52, 152, 219, 0.1);
+            color: var(--secondary);
+        }
+        
+        .status-completed {
+            background: rgba(46, 204, 113, 0.1);
+            color: var(--success);
+        }
+        
+        .status-cancelled {
+            background: rgba(231, 76, 60, 0.1);
+            color: var(--accent);
+        }
+        
+        .status-booked {
+            background: rgba(155, 89, 182, 0.1);
+            color: #9b59b6;
+        }
+        
+        .doctor-card {
+            transition: all 0.3s ease;
+        }
+        
+        .doctor-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .time-slot {
+            transition: all 0.2s ease;
+        }
+        
+        .time-slot:hover:not(.booked) {
+            background-color: #e3f2fd;
+        }
+        
+        .time-slot.booked {
+            background-color: #ffebee;
+            color: #c62828;
+            cursor: not-allowed;
+        }
+        
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .modal.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal-content {
+            background-color: white;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: scale(0.8);
+            transition: transform 0.3s ease;
+        }
+        
+        .modal.show .modal-content {
+            transform: scale(1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-blue-800 to-indigo-900 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-hospital text-3xl"></i>
+                    <h1 class="text-2xl font-bold">Clinic Front Desk System</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="hidden md:inline">Welcome, Sarah</span>
+                    <img src="https://randomuser.me/api/portraits/women/44.jpg" alt="User" class="w-10 h-10 rounded-full border-2 border-white">
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Navigation -->
+    <nav class="bg-white shadow-md">
+        <div class="container mx-auto px-4">
+            <div class="flex">
+                <button class="tab-btn px-6 py-4 font-medium text-blue-600 border-b-2 border-blue-600 focus:outline-none" data-tab="queue">
+                    <i class="fas fa-list-ol mr-2"></i> Queue Management
+                </button>
+                <button class="tab-btn px-6 py-4 font-medium text-gray-600 hover:text-blue-600 focus:outline-none" data-tab="appointment">
+                    <i class="fas fa-calendar-alt mr-2"></i> Appointment Management
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- Queue Management Tab -->
+        <div id="queue-tab" class="tab-content active">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold text-gray-800">Patient Queue</h2>
+                    <button id="add-patient-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center">
+                        <i class="fas fa-user-plus mr-2"></i> Add Walk-in Patient
+                    </button>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Queue Number</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="queue-list" class="bg-white divide-y divide-gray-200">
+                            <!-- Queue items will be added here dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="empty-queue" class="text-center py-8 text-gray-500 hidden">
+                    <i class="fas fa-inbox text-4xl mb-4"></i>
+                    <p>No patients in the queue</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Appointment Management Tab -->
+        <div id="appointment-tab" class="tab-content">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Doctors List -->
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                        <h2 class="text-xl font-bold text-gray-800 mb-6">Available Doctors</h2>
+                        
+                        <div class="mb-6">
+                            <div class="flex flex-wrap gap-3">
+                                <select id="specialization-filter" class="border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">All Specializations</option>
+                                    <option value="cardiology">Cardiology</option>
+                                    <option value="dermatology">Dermatology</option>
+                                    <option value="pediatrics">Pediatrics</option>
+                                    <option value="orthopedics">Orthopedics</option>
+                                </select>
+                                
+                                <select id="location-filter" class="border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">All Locations</option>
+                                    <option value="main-building">Main Building</option>
+                                    <option value="east-wing">East Wing</option>
+                                    <option value="west-wing">West Wing</option>
+                                </select>
+                                
+                                <select id="availability-filter" class="border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">All Availability</option>
+                                    <option value="available">Available Today</option>
+                                    <option value="busy">Busy</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div id="doctors-list" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Doctor cards will be added here dynamically -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Appointments List -->
+                <div class="lg:col-span-1">
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-xl font-bold text-gray-800">Today's Appointments</h2>
+                            <button id="refresh-appointments" class="text-blue-600 hover:text-blue-800">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                        
+                        <div id="appointments-list" class="space-y-4">
+                            <!-- Appointment items will be added here dynamically -->
+                        </div>
+                        
+                        <div id="empty-appointments" class="text-center py-8 text-gray-500 hidden">
+                            <i class="fas fa-calendar-times text-4xl mb-4"></i>
+                            <p>No appointments today</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Add Patient Modal -->
+    <div id="add-patient-modal" class="modal">
+        <div class="modal-content">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-800">Add Walk-in Patient</h3>
+                    <button class="close-modal text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="add-patient-form">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="patient-name">
+                            Patient Name
+                        </label>
+                        <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="patient-name" type="text" placeholder="Enter patient name">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="patient-phone">
+                            Phone Number
+                        </label>
+                        <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="patient-phone" type="tel" placeholder="Enter phone number">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="patient-reason">
+                            Reason for Visit
+                        </label>
+                        <textarea class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="patient-reason" rows="3" placeholder="Enter reason for visit"></textarea>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="patient-priority">
+                            Priority
+                        </label>
+                        <select class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="patient-priority">
+                            <option value="normal">Normal</option>
+                            <option value="urgent">Urgent</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" class="close-modal bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                            Cancel
+                        </button>
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                            Add to Queue
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Book Appointment Modal -->
+    <div id="book-appointment-modal" class="modal">
+        <div class="modal-content">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-800">Book Appointment</h3>
+                    <button class="close-modal text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="book-appointment-form">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="appointment-doctor">
+                            Doctor
+                        </label>
+                        <input type="text" id="appointment-doctor" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" readonly>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="appointment-date">
+                            Date
+                        </label>
+                        <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="appointment-date" type="date">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="appointment-time">
+                            Time
+                        </label>
+                        <select class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="appointment-time">
+                            <option value="">Select a time slot</option>
+                            <option value="09:00">09:00 AM</option>
+                            <option value="09:30">09:30 AM</option>
+                            <option value="10:00">10:00 AM</option>
+                            <option value="10:30">10:30 AM</option>
+                            <option value="11:00">11:00 AM</option>
+                            <option value="11:30">11:30 AM</option>
+                            <option value="14:00">02:00 PM</option>
+                            <option value="14:30">02:30 PM</option>
+                            <option value="15:00">03:00 PM</option>
+                            <option value="15:30">03:30 PM</option>
+                            <option value="16:00">04:00 PM</option>
+                            <option value="16:30">04:30 PM</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="appointment-patient">
+                            Patient Name
+                        </label>
+                        <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="appointment-patient" type="text" placeholder="Enter patient name">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="appointment-phone">
+                            Phone Number
+                        </label>
+                        <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="appointment-phone" type="tel" placeholder="Enter phone number">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="appointment-reason">
+                            Reason for Visit
+                        </label>
+                        <textarea class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="appointment-reason" rows="3" placeholder="Enter reason for visit"></textarea>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" class="close-modal bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                            Cancel
+                        </button>
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                            Book Appointment
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div id="notification" class="notification">
+        <div class="notification-icon">
+            <i class="fas fa-check-circle"></i>
+        </div>
+        <div class="notification-message">
+            Action completed successfully!
+        </div>
+        <div class="notification-close">
+            <i class="fas fa-times"></i>
+        </div>
+    </div>
+
+    <script>
+        // Sample data
+        let patientsQueue = [
+            { id: 1, queueNumber: 'A001', name: 'John Smith', status: 'waiting', priority: 'normal' },
+            { id: 2, queueNumber: 'A002', name: 'Emily Johnson', status: 'with-doctor', priority: 'normal' },
+            { id: 3, queueNumber: 'A003', name: 'Michael Brown', status: 'waiting', priority: 'urgent' },
+            { id: 4, queueNumber: 'A004', name: 'Sarah Davis', status: 'completed', priority: 'normal' }
+        ];
+        
+        let appointments = [
+            { id: 1, doctorId: 1, doctorName: 'Dr. James Wilson', patientName: 'Robert Miller', date: '2023-06-15', time: '09:30', status: 'booked' },
+            { id: 2, doctorId: 3, doctorName: 'Dr. Lisa Anderson', patientName: 'Jennifer Taylor', date: '2023-06-15', time: '11:00', status: 'booked' },
+            { id: 3, doctorId: 2, doctorName: 'Dr. Michael Chen', patientName: 'David Moore', date: '2023-06-15', time: '14:30', status: 'booked' }
+        ];
+        
+        let doctors = [
+            { id: 1, name: 'Dr. James Wilson', specialization: 'cardiology', location: 'main-building', availability: 'available', image: 'https://randomuser.me/api/portraits/men/32.jpg' },
+            { id: 2, name: 'Dr. Michael Chen', specialization: 'dermatology', location: 'east-wing', availability: 'busy', image: 'https://randomuser.me/api/portraits/men/75.jpg' },
+            { id: 3, name: 'Dr. Lisa Anderson', specialization: 'pediatrics', location: 'west-wing', availability: 'available', image: 'https://randomuser.me/api/portraits/women/68.jpg' },
+            { id: 4, name: 'Dr. Robert Johnson', specialization: 'orthopedics', location: 'main-building', availability: 'available', image: 'https://randomuser.me/api/portraits/men/54.jpg' }
+        ];
+        
+        // DOM elements
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        const queueList = document.getElementById('queue-list');
+        const emptyQueue = document.getElementById('empty-queue');
+        const doctorsList = document.getElementById('doctors-list');
+        const appointmentsList = document.getElementById('appointments-list');
+        const emptyAppointments = document.getElementById('empty-appointments');
+        const addPatientBtn = document.getElementById('add-patient-btn');
+        const addPatientModal = document.getElementById('add-patient-modal');
+        const bookAppointmentModal = document.getElementById('book-appointment-modal');
+        const addPatientForm = document.getElementById('add-patient-form');
+        const bookAppointmentForm = document.getElementById('book-appointment-form');
+        const notification = document.getElementById('notification');
+        const notificationMessage = document.querySelector('.notification-message');
+        const notificationClose = document.querySelector('.notification-close');
+        const refreshAppointmentsBtn = document.getElementById('refresh-appointments');
+        
+        // Tab switching
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabId = btn.getAttribute('data-tab');
+                
+                // Update tab buttons
+                tabBtns.forEach(b => {
+                    b.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+                    b.classList.add('text-gray-600');
+                });
+                
+                btn.classList.remove('text-gray-600');
+                btn.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+                
+                // Update tab content
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                document.getElementById(`${tabId}-tab`).classList.add('active');
+            });
+        });
+        
+        // Show notification
+        function showNotification(message, isError = false) {
+            notificationMessage.textContent = message;
+            
+            if (isError) {
+                notification.classList.add('error');
+            } else {
+                notification.classList.remove('error');
+            }
+            
+            notification.classList.add('show');
+            
+            // Auto hide after 3 seconds
+            setTimeout(() => {
+                hideNotification();
+            }, 3000);
+        }
+        
+        // Hide notification
+        function hideNotification() {
+            notification.classList.remove('show');
+        }
+        
+        notificationClose.addEventListener('click', hideNotification);
+        
+        // Render queue
+        function renderQueue() {
+            if (patientsQueue.length === 0) {
+                queueList.innerHTML = '';
+                emptyQueue.classList.remove('hidden');
+                return;
+            }
+            
+            emptyQueue.classList.add('hidden');
+            
+            queueList.innerHTML = patientsQueue.map(patient => `
+                <tr class="${patient.priority === 'urgent' ? 'bg-yellow-50' : ''}">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <span class="text-lg font-bold ${patient.priority === 'urgent' ? 'text-red-600' : 'text-gray-900'}">${patient.queueNumber}</span>
+                            ${patient.priority === 'urgent' ? '<i class="fas fa-exclamation-circle text-red-500 ml-2"></i>' : ''}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">${patient.name}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="status-badge status-${patient.status}">${formatStatus(patient.status)}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div class="flex space-x-2">
+                            ${patient.status !== 'completed' ? `
+                                <button class="update-status text-blue-600 hover:text-blue-900" data-id="${patient.id}" data-status="waiting">
+                                    <i class="fas fa-clock"></i>
+                                </button>
+                                <button class="update-status text-indigo-600 hover:text-indigo-900" data-id="${patient.id}" data-status="with-doctor">
+                                    <i class="fas fa-user-md"></i>
+                                </button>
+                            ` : ''}
+                            ${patient.status !== 'completed' ? `
+                                <button class="update-status text-green-600 hover:text-green-900" data-id="${patient.id}" data-status="completed">
+                                    <i class="fas fa-check-circle"></i>
+                                </button>
+                            ` : ''}
+                            <button class="remove-patient text-red-600 hover:text-red-900" data-id="${patient.id}">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+            
+            // Add event listeners to update status buttons
+            document.querySelectorAll('.update-status').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const patientId = parseInt(this.getAttribute('data-id'));
+                    const newStatus = this.getAttribute('data-status');
+                    
+                    updatePatientStatus(patientId, newStatus);
+                });
+            });
+            
+            // Add event listeners to remove patient buttons
+            document.querySelectorAll('.remove-patient').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const patientId = parseInt(this.getAttribute('data-id'));
+                    
+                    removePatient(patientId);
+                });
+            });
+        }
+        
+        // Format status text
+        function formatStatus(status) {
+            switch(status) {
+                case 'waiting': return 'Waiting';
+                case 'with-doctor': return 'With Doctor';
+                case 'completed': return 'Completed';
+                case 'booked': return 'Booked';
+                case 'cancelled': return 'Cancelled';
+                default: return status;
+            }
+        }
+        
+        // Update patient status
+        function updatePatientStatus(patientId, newStatus) {
+            const patientIndex = patientsQueue.findIndex(p => p.id === patientId);
+            
+            if (patientIndex !== -1) {
+                patientsQueue[patientIndex].status = newStatus;
+                renderQueue();
+                showNotification(`Patient status updated to ${formatStatus(newStatus)}`);
+            }
+        }
+        
+        // Remove patient from queue
+        function removePatient(patientId) {
+            patientsQueue = patientsQueue.filter(p => p.id !== patientId);
+            renderQueue();
+            showNotification('Patient removed from queue');
+        }
+        
+        // Render doctors
+        function renderDoctors() {
+            if (doctors.length === 0) {
+                doctorsList.innerHTML = '<p class="text-center py-4 text-gray-500">No doctors available</p>';
+                return;
+            }
+            
+            doctorsList.innerHTML = doctors.map(doctor => `
+                <div class="doctor-card bg-white border rounded-lg overflow-hidden shadow-sm">
+                    <div class="p-5">
+                        <div class="flex items-center mb-4">
+                            <img src="${doctor.image}" alt="${doctor.name}" class="w-16 h-16 rounded-full mr-4">
+                            <div>
+                                <h3 class="font-bold text-lg">${doctor.name}</h3>
+                                <p class="text-gray-600 capitalize">${doctor.specialization}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <div class="flex items-center text-sm text-gray-600 mb-1">
+                                <i class="fas fa-map-marker-alt w-5"></i>
+                                <span class="capitalize">${doctor.location.replace('-', ' ')}</span>
+                            </div>
+                            <div class="flex items-center text-sm">
+                                <i class="fas fa-circle w-5 ${doctor.availability === 'available' ? 'text-green-500' : 'text-yellow-500'}"></i>
+                                <span class="capitalize">${doctor.availability}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-between items-center">
+                            <button class="view-schedule text-blue-600 hover:text-blue-800 text-sm font-medium">
+                                View Schedule
+                            </button>
+                            <button class="book-appointment bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm" data-id="${doctor.id}" data-name="${doctor.name}">
+                                Book
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Add event listeners to book appointment buttons
+            document.querySelectorAll('.book-appointment').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const doctorId = this.getAttribute('data-id');
+                    const doctorName = this.getAttribute('data-name');
+                    
+                    document.getElementById('appointment-doctor').value = doctorName;
+                    document.getElementById('book-appointment-modal').classList.add('show');
+                });
+            });
+        }
+        
+        // Render appointments
+        function renderAppointments() {
+            if (appointments.length === 0) {
+                appointmentsList.innerHTML = '';
+                emptyAppointments.classList.remove('hidden');
+                return;
+            }
+            
+            emptyAppointments.classList.add('hidden');
+            
+            appointmentsList.innerHTML = appointments.map(appointment => `
+                <div class="border rounded-lg p-4 hover:bg-gray-50">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="font-bold">${appointment.patientName}</h3>
+                        <span class="status-badge status-${appointment.status}">${formatStatus(appointment.status)}</span>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-1">Dr. ${appointment.doctorName}</p>
+                    <p class="text-sm text-gray-600 mb-3">${appointment.date} at ${appointment.time}</p>
+                    <div class="flex space-x-2">
+                        <button class="reschedule-appointment text-blue-600 hover:text-blue-800 text-sm" data-id="${appointment.id}">
+                            <i class="fas fa-calendar-alt mr-1"></i> Reschedule
+                        </button>
+                        <button class="cancel-appointment text-red-600 hover:text-red-800 text-sm" data-id="${appointment.id}">
+                            <i class="fas fa-times-circle mr-1"></i> Cancel
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Add event listeners to reschedule buttons
+            document.querySelectorAll('.reschedule-appointment').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const appointmentId = parseInt(this.getAttribute('data-id'));
+                    showNotification('Reschedule feature would open here');
+                });
+            });
+            
+            // Add event listeners to cancel buttons
+            document.querySelectorAll('.cancel-appointment').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const appointmentId = parseInt(this.getAttribute('data-id'));
+                    cancelAppointment(appointmentId);
+                });
+            });
+        }
+        
+        // Cancel appointment
+        function cancelAppointment(appointmentId) {
+            const appointmentIndex = appointments.findIndex(a => a.id === appointmentId);
+            
+            if (appointmentIndex !== -1) {
+                appointments[appointmentIndex].status = 'cancelled';
+                renderAppointments();
+                showNotification('Appointment cancelled');
+            }
+        }
+        
+        // Add patient modal
+        addPatientBtn.addEventListener('click', () => {
+            addPatientModal.classList.add('show');
+        });
+        
+        // Book appointment modal
+        document.querySelectorAll('.close-modal').forEach(btn => {
+            btn.addEventListener('click', () => {
+                addPatientModal.classList.remove('show');
+                bookAppointmentModal.classList.remove('show');
+            });
+        });
+        
+        // Add patient form submission
+        addPatientForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const name = document.getElementById('patient-name').value;
+            const phone = document.getElementById('patient-phone').value;
+            const reason = document.getElementById('patient-reason').value;
+            const priority = document.getElementById('patient-priority').value;
+            
+            if (!name || !phone) {
+                showNotification('Please fill in all required fields', true);
+                return;
+            }
+            
+            // Generate queue number
+            const lastQueueNumber = patientsQueue.length > 0 
+                ? Math.max(...patientsQueue.map(p => parseInt(p.queueNumber.substring(1)))) 
+                : 0;
+            const newQueueNumber = `A${String(lastQueueNumber + 1).padStart(3, '0')}`;
+            
+            // Add new patient to queue
+            const newPatient = {
+                id: patientsQueue.length + 1,
+                queueNumber: newQueueNumber,
+                name: name,
+                status: 'waiting',
+                priority: priority
+            };
+            
+            patientsQueue.push(newPatient);
+            renderQueue();
+            
+            // Reset form and close modal
+            addPatientForm.reset();
+            addPatientModal.classList.remove('show');
+            
+            showNotification(`${name} added to queue with number ${newQueueNumber}`);
+        });
+        
+        // Book appointment form submission
+        bookAppointmentForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const doctorName = document.getElementById('appointment-doctor').value;
+            const date = document.getElementById('appointment-date').value;
+            const time = document.getElementById('appointment-time').value;
+            const patientName = document.getElementById('appointment-patient').value;
+            const phone = document.getElementById('appointment-phone').value;
+            const reason = document.getElementById('appointment-reason').value;
+            
+            if (!doctorName || !date || !time || !patientName || !phone) {
+                showNotification('Please fill in all required fields', true);
+                return;
+            }
+            
+            // Add new appointment
+            const newAppointment = {
+                id: appointments.length + 1,
+                doctorId: 1, // This would come from the doctor selection
+                doctorName: doctorName,
+                patientName: patientName,
+                date: date,
+                time: time,
+                status: 'booked'
+            };
+            
+            appointments.push(newAppointment);
+            renderAppointments();
+            
+            // Reset form and close modal
+            bookAppointmentForm.reset();
+            bookAppointmentModal.classList.remove('show');
+            
+            showNotification(`Appointment booked for ${patientName} with ${doctorName}`);
+        });
+        
+        // Refresh appointments
+        refreshAppointmentsBtn.addEventListener('click', () => {
+            renderAppointments();
+            showNotification('Appointments refreshed');
+        });
+        
+        // Filter doctors
+        document.getElementById('specialization-filter').addEventListener('change', filterDoctors);
+        document.getElementById('location-filter').addEventListener('change', filterDoctors);
+        document.getElementById('availability-filter').addEventListener('change', filterDoctors);
+        
+        function filterDoctors() {
+            const specialization = document.getElementById('specialization-filter').value;
+            const location = document.getElementById('location-filter').value;
+            const availability = document.getElementById('availability-filter').value;
+            
+            let filteredDoctors = [...doctors];
+            
+            if (specialization) {
+                filteredDoctors = filteredDoctors.filter(d => d.specialization === specialization);
+            }
+            
+            if (location) {
+                filteredDoctors = filteredDoctors.filter(d => d.location === location);
+            }
+            
+            if (availability) {
+                filteredDoctors = filteredDoctors.filter(d => d.availability === availability);
+            }
+            
+            // Temporarily replace doctors array with filtered results
+            const originalDoctors = [...doctors];
+            doctors = filteredDoctors;
+            renderDoctors();
+            doctors = originalDoctors;
+        }
+        
+        // Initialize the page
+        renderQueue();
+        renderDoctors();
+        renderAppointments();
+    </script>
+</body>
+</html>
