@@ -81,8 +81,7 @@ The Front Desk System is a simple web-based application to manage patient queues
 
 ## 🎮 Demo
 
-You can view the live application here: [https://deekshavpanchal01.github.io/clinic-front-desk](https://deekshavpanchal01.github.io/clinic-front-desk)
-
+You can view the live application here: https://soft-tarsier-d14780.netlify.app/
 ## 🚀 Getting Started
 
 To get a local copy up and running, follow these steps:
